@@ -105,6 +105,17 @@ class Display {
   struct wl_surface* m_cursor_surface{};
   std::string m_cursor_theme_name;
 
+  struct {
+    int32_t rate_sec;
+    int32_t rate_nsec;
+    int32_t delay_sec;
+    int32_t delay_nsec;
+    uint32_t sym;
+    uint32_t key;
+    uint32_t time;
+//    struct timer timer;
+  } m_repeat{};
+
   struct pointer_event {
     [[maybe_unused]] uint32_t event_mask;
     double surface_x, surface_y;
@@ -160,6 +171,7 @@ class Display {
   struct xkb_context* m_xkb_context;
   struct xkb_keymap* m_keymap{};
   struct xkb_state* m_xkb_state{};
+  xkb_keysym_t m_keysym_pressed{};
 
   std::shared_ptr<TextInput> m_text_input{};
 
@@ -328,6 +340,10 @@ class Display {
                                           int32_t delay);
 
   static const struct wl_keyboard_listener keyboard_listener;
+
+  static void set_repeat_info(Display *d, int32_t rate, int32_t delay);
+
+  static void keyboard_repeat_func(void* data);
 
   [[maybe_unused]] static struct touch_point* get_touch_point(Display* d,
                                                               int32_t id);

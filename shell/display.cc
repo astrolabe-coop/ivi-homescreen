@@ -14,11 +14,11 @@
 
 #include "display.h"
 
-#include <algorithm>
 #include <flutter/fml/logging.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <utility>
@@ -26,8 +26,7 @@
 #include "constants.h"
 #include "engine.h"
 
-Display::Display(bool enable_cursor,
-                 std::string cursor_theme_name)
+Display::Display(bool enable_cursor, std::string cursor_theme_name)
     : m_xkb_context(xkb_context_new(XKB_CONTEXT_NO_FLAGS)),
       m_buffer_scale(1),
       m_last_buffer_scale(m_buffer_scale),
@@ -55,6 +54,9 @@ Display::Display(bool enable_cursor,
 
 Display::~Display() {
   FML_DLOG(INFO) << "+ ~Display()";
+
+  // TODO - destroy repeat time here
+  // m_repeat_timer->fini();
 
   if (m_shm)
     wl_shm_destroy(m_shm);
@@ -107,43 +109,35 @@ void Display::registry_handle_global(
   if (strcmp(interface, wl_compositor_interface.name) == 0) {
     if (version >= 3) {
       d->m_compositor = static_cast<struct wl_compositor*>(
-          wl_registry_bind(registry, name,
-                           &wl_compositor_interface,
+          wl_registry_bind(registry, name, &wl_compositor_interface,
                            std::min(static_cast<uint32_t>(3), version)));
       FML_DLOG(INFO) << "\tBuffer Scale Enabled";
       d->m_buffer_scale_enable = true;
-    }
-    else {
+    } else {
       d->m_compositor = static_cast<struct wl_compositor*>(
-          wl_registry_bind(registry, name,
-                           &wl_compositor_interface,
+          wl_registry_bind(registry, name, &wl_compositor_interface,
                            std::min(static_cast<uint32_t>(2), version)));
     }
     d->m_base_surface = wl_compositor_create_surface(d->m_compositor);
-    wl_surface_add_listener(d->m_base_surface,
-                            &base_surface_listener, d);
+    wl_surface_add_listener(d->m_base_surface, &base_surface_listener, d);
   }
 
   else if (strcmp(interface, wl_subcompositor_interface.name) == 0) {
     d->m_subcompositor = static_cast<struct wl_subcompositor*>(
-        wl_registry_bind(registry, name,
-                         &wl_subcompositor_interface,
+        wl_registry_bind(registry, name, &wl_subcompositor_interface,
                          std::min(static_cast<uint32_t>(1), version)));
   }
 
   else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
     d->m_xdg_wm_base = static_cast<struct xdg_wm_base*>(
-        wl_registry_bind(registry, name,
-                         &xdg_wm_base_interface,
+        wl_registry_bind(registry, name, &xdg_wm_base_interface,
                          std::min(static_cast<uint32_t>(3), version)));
-    xdg_wm_base_add_listener(d->m_xdg_wm_base,
-                             &xdg_wm_base_listener, d);
+    xdg_wm_base_add_listener(d->m_xdg_wm_base, &xdg_wm_base_listener, d);
   }
 
   else if (strcmp(interface, wl_shm_interface.name) == 0) {
     d->m_shm = static_cast<struct wl_shm*>(
-        wl_registry_bind(registry, name,
-                         &wl_shm_interface,
+        wl_registry_bind(registry, name, &wl_shm_interface,
                          std::min(static_cast<uint32_t>(1), version)));
     wl_shm_add_listener(d->m_shm, &shm_listener, d);
 
@@ -158,27 +152,26 @@ void Display::registry_handle_global(
     auto oi = std::make_shared<output_info_t>();
     std::fill_n(oi.get(), 1, output_info_t{});
     oi->global_id = name;
-    oi->output = static_cast<struct wl_output*>(wl_registry_bind(
-        registry, name, &wl_output_interface,
-        std::min(static_cast<uint32_t>(2), version)));
-    wl_output_add_listener(oi->output,
-                           &output_listener,
-                           oi.get());
+    oi->output = static_cast<struct wl_output*>(
+        wl_registry_bind(registry, name, &wl_output_interface,
+                         std::min(static_cast<uint32_t>(2), version)));
+    wl_output_add_listener(oi->output, &output_listener, oi.get());
     d->m_all_outputs.push_back(oi);
   }
 
   else if (strcmp(interface, wl_seat_interface.name) == 0) {
     d->m_seat = static_cast<wl_seat*>(
-        wl_registry_bind(registry, name,
-                         &wl_seat_interface,
-                         std::min(static_cast<uint32_t>(5), version)));
+        wl_registry_bind(registry, name, &wl_seat_interface,
+                         std::min(static_cast<uint32_t>(4), version)));
     wl_seat_add_listener(d->m_seat, &seat_listener, d);
+    set_repeat_info(d, 40, 400);
+    // TODO - initialize timer here
+    // d->m_repeat_timer->init(CLOCK_MONOTONIC, d, keyboard_repeat_func);
   }
 
   else if (strcmp(interface, agl_shell_interface.name) == 0) {
     d->m_agl_shell = static_cast<struct agl_shell*>(
-        wl_registry_bind(registry, name,
-                         &agl_shell_interface,
+        wl_registry_bind(registry, name, &agl_shell_interface,
                          std::min(static_cast<uint32_t>(1), version)));
   }
 }
@@ -307,7 +300,7 @@ void Display::seat_handle_capabilities(void* data,
 
 void Display::seat_handle_name(void* data,
                                struct wl_seat* seat,
-                               const char *name) {
+                               const char* name) {
   (void)data;
   (void)seat;
   FML_DLOG(INFO) << "Seat: " << name;
@@ -318,7 +311,7 @@ const struct wl_seat_listener Display::seat_listener = {
     .name = seat_handle_name,
 };
 
-bool Display::pointerButtonStatePressed(struct pointer *p) {
+bool Display::pointerButtonStatePressed(struct pointer* p) {
   return (p->buttons) && (p->event.state == WL_POINTER_BUTTON_STATE_PRESSED);
 }
 
@@ -367,15 +360,17 @@ void Display::pointer_handle_motion(void* data,
   (void)time;
   auto* d = static_cast<Display*>(data);
 
-  d->m_pointer.event.surface_x = wl_fixed_to_double(sx * (wl_fixed_t)d->m_buffer_scale);
-  d->m_pointer.event.surface_y = wl_fixed_to_double(sy * (wl_fixed_t)d->m_buffer_scale);
+  d->m_pointer.event.surface_x =
+      wl_fixed_to_double(sx * (wl_fixed_t)d->m_buffer_scale);
+  d->m_pointer.event.surface_y =
+      wl_fixed_to_double(sy * (wl_fixed_t)d->m_buffer_scale);
 
   if (d->m_flutter_engine) {
-    FlutterPointerPhase phase = pointerButtonStatePressed(&d->m_pointer) ? kMove : kHover; 
+    FlutterPointerPhase phase =
+        pointerButtonStatePressed(&d->m_pointer) ? kMove : kHover;
     d->m_flutter_engine->SendMouseEvent(
-        kFlutterPointerSignalKindNone, phase,
-        d->m_pointer.event.surface_x, d->m_pointer.event.surface_y, 0.0, 0.0,
-        d->m_pointer.buttons);
+        kFlutterPointerSignalKindNone, phase, d->m_pointer.event.surface_x,
+        d->m_pointer.event.surface_y, 0.0, 0.0, d->m_pointer.buttons);
   }
 }
 
@@ -393,13 +388,12 @@ void Display::pointer_handle_button(
   d->m_pointer.serial = serial;
 
   if (d->m_flutter_engine) {
-    FlutterPointerPhase phase = pointerButtonStatePressed(&d->m_pointer) ? kDown : kUp; 
+    FlutterPointerPhase phase =
+        pointerButtonStatePressed(&d->m_pointer) ? kDown : kUp;
     d->m_flutter_engine->SendMouseEvent(
-        kFlutterPointerSignalKindNone, phase,
-        d->m_pointer.event.surface_x, d->m_pointer.event.surface_y, 0.0, 0.0,
-        d->m_pointer.buttons);
+        kFlutterPointerSignalKindNone, phase, d->m_pointer.event.surface_x,
+        d->m_pointer.event.surface_y, 0.0, 0.0, d->m_pointer.buttons);
   }
-
 }
 
 void Display::pointer_handle_axis(
@@ -421,22 +415,21 @@ void Display::pointer_handle_axis(
   }
 }
 
-void Display::pointer_handle_frame(void *data,
-                                   struct wl_pointer *wl_pointer) {
+void Display::pointer_handle_frame(void* data, struct wl_pointer* wl_pointer) {
   (void)data;
   (void)wl_pointer;
 }
 
-void Display::pointer_handle_axis_source(void *data,
-                                         struct wl_pointer *wl_pointer,
+void Display::pointer_handle_axis_source(void* data,
+                                         struct wl_pointer* wl_pointer,
                                          uint32_t axis_source) {
   (void)data;
   (void)wl_pointer;
   (void)axis_source;
 }
 
-void Display::pointer_handle_axis_stop(void *data,
-                                       struct wl_pointer *wl_pointer,
+void Display::pointer_handle_axis_stop(void* data,
+                                       struct wl_pointer* wl_pointer,
                                        uint32_t time,
                                        uint32_t axis) {
   (void)data;
@@ -445,8 +438,8 @@ void Display::pointer_handle_axis_stop(void *data,
   (void)axis;
 }
 
-void Display::pointer_handle_axis_discrete(void *data,
-                                           struct wl_pointer *wl_pointer,
+void Display::pointer_handle_axis_discrete(void* data,
+                                           struct wl_pointer* wl_pointer,
                                            uint32_t axis,
                                            int32_t discrete) {
   (void)data;
@@ -478,7 +471,10 @@ void Display::keyboard_handle_leave(
     [[maybe_unused]] void* data,
     [[maybe_unused]] struct wl_keyboard* keyboard,
     [[maybe_unused]] uint32_t serial,
-    [[maybe_unused]] struct wl_surface* surface) {}
+    [[maybe_unused]] struct wl_surface* surface) {
+  // TODO disarm timer here
+  // &d->m_repeat_timer->disarm()
+}
 
 void Display::keyboard_handle_keymap(
     void* data,
@@ -499,36 +495,63 @@ void Display::keyboard_handle_keymap(
   d->m_xkb_state = xkb_state_new(d->m_keymap);
 }
 
-void Display::keyboard_handle_key([[maybe_unused]] void* data,
-                                  [[maybe_unused]] struct wl_keyboard* keyboard,
-                                  [[maybe_unused]] uint32_t serial,
-                                  [[maybe_unused]] uint32_t time,
-                                  [[maybe_unused]] uint32_t key,
-                                  [[maybe_unused]] uint32_t state) {
-#if ENABLE_PLUGIN_TEXT_INPUT
+void Display::keyboard_handle_key(void* data,
+                                  struct wl_keyboard* keyboard,
+                                  uint32_t serial,
+                                  uint32_t time,
+                                  uint32_t key,
+                                  uint32_t state) {
   auto* d = static_cast<Display*>(data);
+  if (!d->m_xkb_state)
+    return;
+
+  uint32_t code = key + 8;
+  const xkb_keysym_t *syms;
+
+  uint32_t num_syms = xkb_state_key_get_syms(d->m_xkb_state, code, &syms);
+
+  xkb_keysym_t sym = XKB_KEY_NoSymbol;
+  if (num_syms == 1)
+    sym = syms[0];
+
+#if ENABLE_PLUGIN_TEXT_INPUT
   if (d->m_text_input) {
     if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-      xkb_keysym_t keysym = xkb_state_key_get_one_sym(d->m_xkb_state, key + 8);
-      d->m_text_input->keyboard_handle_key(d->m_text_input.get(), keyboard,
-                                           serial, time, keysym, state);
+      d->m_keysym_pressed = sym;
+      d->m_text_input->keyboard_handle_key(d->m_text_input.get(),
+                                           d->m_keysym_pressed, state);
+    } else if (state == WL_KEYBOARD_KEY_STATE_RELEASED) {
+      d->m_text_input->keyboard_handle_key(d->m_text_input.get(), sym,
+                                           state);
     }
   }
-#elif !defined(NDEBUG)
-  auto* d = static_cast<Display*>(data);
+#endif
+#if !defined(NDEBUG)
   if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-    [[maybe_unused]] xkb_keysym_t keysym =
-        xkb_state_key_get_one_sym(d->m_xkb_state, key + 8);
-    uint32_t utf32 = xkb_keysym_to_utf32(keysym);
+    uint32_t utf32 = xkb_keysym_to_utf32(sym);
     if (utf32) {
       FML_DLOG(INFO) << "[Press] U" << utf32;
     } else {
       [[maybe_unused]] char name[64];
-      xkb_keysym_get_name(keysym, name, 64);
+      xkb_keysym_get_name(sym, name, 64);
       FML_DLOG(INFO) << "[Press] " << name;
     }
   }
 #endif
+  if (state == WL_KEYBOARD_KEY_STATE_RELEASED && key == d->m_repeat.key) {
+    d->m_repeat_timer->disarm();
+  } else if (state == WL_KEYBOARD_KEY_STATE_PRESSED &&
+             xkb_keymap_key_repeats(d->m_keymap, code)) {
+    d->m_repeat.sym = sym;
+    d->m_repeat.key = key;
+    d->m_repeat.time = time;
+    d->m_repeat_timer->arm({
+                               d->m_repeat.rate_sec,
+                               d->m_repeat.rate_nsec,
+                               d->m_repeat.delay_sec,
+                               d->m_repeat.delay_nsec
+                           });
+  }
 }
 
 void Display::keyboard_handle_modifiers(
@@ -544,12 +567,15 @@ void Display::keyboard_handle_modifiers(
                         mods_locked, 0, 0, group);
 }
 
-void Display::keyboard_handle_repeat_info(void *data,
-                                          struct wl_keyboard *wl_keyboard,
-                                          int32_t rate, int32_t delay) {
-      (void) data;
-      (void) wl_keyboard;
-      FML_DLOG(INFO) << "[keyboard repeat info] rate: " << rate << ", delay: " << delay;
+void Display::keyboard_handle_repeat_info(void* data,
+                                          struct wl_keyboard* wl_keyboard,
+                                          int32_t rate,
+                                          int32_t delay) {
+  (void)wl_keyboard;
+  // FML_DLOG(INFO) << "[keyboard repeat info] rate: " << rate << ", delay: " <<
+  // delay;
+  auto d = reinterpret_cast<Display*>(data);
+  set_repeat_info(d, rate, delay);
 }
 
 const struct wl_keyboard_listener Display::keyboard_listener = {
@@ -560,6 +586,35 @@ const struct wl_keyboard_listener Display::keyboard_listener = {
     .modifiers = keyboard_handle_modifiers,
     .repeat_info = keyboard_handle_repeat_info,
 };
+
+void Display::set_repeat_info(Display* d, int32_t rate, int32_t delay) {
+  d->m_repeat.rate_sec = d->m_repeat.rate_nsec = 0;
+  d->m_repeat.delay_sec = d->m_repeat.delay_nsec = 0;
+
+  // a rate of zero disables any repeating, regardless of the delay's value
+  if (rate == 0)
+    return;
+
+  if (rate == 1)
+    d->m_repeat.rate_sec = 1;
+  else
+    d->m_repeat.rate_nsec = 1000000000 / rate;
+
+  d->m_repeat.delay_sec = delay / 1000;
+  delay -= (d->m_repeat.delay_sec * 1000);
+  d->m_repeat.delay_nsec = delay * 1000 * 1000;
+}
+
+void Display::keyboard_repeat_func(void* data) {
+#if ENABLE_PLUGIN_TEXT_INPUT
+  auto d = reinterpret_cast<Display*>(data);
+  d->m_text_input->keyboard_handle_key(d->m_text_input.get(),
+                                       d->m_keysym_pressed,
+                                       WL_KEYBOARD_KEY_STATE_PRESSED);
+#else
+  (void)data;
+#endif
+}
 
 [[maybe_unused]] struct Display::touch_point* Display::get_touch_point(
     Display* d,
@@ -661,9 +716,8 @@ const struct wl_touch_listener Display::touch_listener = {
     .cancel = touch_handle_cancel,
 };
 
-[[maybe_unused]] void Display::AglShellDoBackground(
-    struct wl_surface* surface,
-    size_t index) {
+[[maybe_unused]] void Display::AglShellDoBackground(struct wl_surface* surface,
+                                                    size_t index) {
   if (m_agl_shell) {
     agl_shell_set_background(m_agl_shell, surface,
                              m_all_outputs[index]->output);
@@ -675,8 +729,8 @@ const struct wl_touch_listener Display::touch_listener = {
     [[maybe_unused]] enum agl_shell_edge mode,
     size_t index) {
   if (m_agl_shell) {
-    agl_shell_set_panel(m_agl_shell, surface,
-                        m_all_outputs[index]->output, mode);
+    agl_shell_set_panel(m_agl_shell, surface, m_all_outputs[index]->output,
+                        mode);
   }
 }
 
@@ -718,8 +772,7 @@ bool Display::ActivateSystemCursor([[maybe_unused]] int32_t device,
       FML_DLOG(INFO) << "Cursor [" << cursor_name << "] not found";
       return false;
     }
-    auto cursor_buffer =
-        wl_cursor_image_get_buffer(cursor->images[0]);
+    auto cursor_buffer = wl_cursor_image_get_buffer(cursor->images[0]);
     if (cursor_buffer && m_cursor_surface) {
       wl_pointer_set_cursor(m_pointer.pointer, m_pointer.serial,
                             m_cursor_surface,
@@ -766,15 +819,16 @@ void Display::handle_base_surface_enter(void* data,
   }
 }
 
-void Display::handle_base_surface_leave(void *data,
-                                        struct wl_surface *wl_surface,
-                                        struct wl_output *output) {
+void Display::handle_base_surface_leave(void* data,
+                                        struct wl_surface* wl_surface,
+                                        struct wl_output* output) {
   (void)wl_surface;
-  auto *d = static_cast<Display *>(data);
+  auto* d = static_cast<Display*>(data);
 
-  for (auto &out: d->m_all_outputs) {
+  for (auto& out : d->m_all_outputs) {
     if (out->output == output) {
-      FML_DLOG(INFO) << "Leaving output #" << out->global_id << ", scale " << out->scale;
+      FML_DLOG(INFO) << "Leaving output #" << out->global_id << ", scale "
+                     << out->scale;
       break;
     }
   }

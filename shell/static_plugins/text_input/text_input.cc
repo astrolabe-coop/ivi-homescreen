@@ -173,9 +173,6 @@ done:
 }
 
 void TextInput::keyboard_handle_key(void* data,
-                                    struct wl_keyboard* keyboard,
-                                    uint32_t serial,
-                                    uint32_t time,
                                     xkb_keysym_t keysym,
                                     uint32_t state) {
   auto* text_input = static_cast<TextInput*>(data);
@@ -255,6 +252,18 @@ void TextInput::keyboard_handle_key(void* data,
       char name[64];
       xkb_keysym_get_name(keysym, name, 64);
       FML_DLOG(INFO) << "[Press] " << name;
+    }
+#endif
+  }
+  else if (state == WL_KEYBOARD_KEY_STATE_RELEASED) {
+#if !defined(NDEBUG)
+    uint32_t utf32 = xkb_keysym_to_utf32(keysym);
+    if (utf32) {
+      FML_DLOG(INFO) << "[Released] U" << utf32;
+    } else {
+      char name[64];
+      xkb_keysym_get_name(keysym, name, 64);
+      FML_DLOG(INFO) << "[Released] " << name;
     }
 #endif
   }
