@@ -1,17 +1,17 @@
 /*
-* Copyright 2021-2022 Toyota Connected North America
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
+ * Copyright 2021-2022 Toyota Connected North America
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #pragma once
@@ -26,10 +26,10 @@
 class WaylandVulkanBackend : Backend {
  public:
   WaylandVulkanBackend(struct wl_display* display,
-                struct wl_surface* surface,
-                uint32_t width,
-                uint32_t height,
-                bool enable_validation_layers);
+                       struct wl_surface* surface,
+                       uint32_t width,
+                       uint32_t height,
+                       bool enable_validation_layers);
   ~WaylandVulkanBackend();
   static void Resize(void* user_data,
                      size_t index,
@@ -60,6 +60,9 @@ class WaylandVulkanBackend : Backend {
     uint32_t queue_family_index{};
     VkQueue queue{};
 
+    bool validationFeaturesSupported = false;
+    bool debugUtilsSupported = false;
+    bool debugReportExtensionSupported = false;
     bool debugMarkersSupported{false};
     bool portabilitySubsetSupported{false};
     bool maintenanceSupported[3]{false};
@@ -89,15 +92,7 @@ class WaylandVulkanBackend : Backend {
 
   void createInstance();
   void setupDebugMessenger();
-  static VkResult CreateDebugUtilsMessengerEXT(
-      VkInstance instance,
-      const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-      const VkAllocationCallbacks* pAllocator,
-      VkDebugUtilsMessengerEXT* pDebugMessenger);
-  static void DestroyDebugUtilsMessengerEXT(
-      VkInstance instance,
-      VkDebugUtilsMessengerEXT debugMessenger,
-      const VkAllocationCallbacks* pAllocator);
+
   void createSurface(struct wl_display* display, struct wl_surface* surface);
   void findPhysicalDevice();
   void createLogicalDevice();
@@ -107,12 +102,6 @@ class WaylandVulkanBackend : Backend {
   static std::vector<VkExtensionProperties>
   enumerateInstanceExtensionProperties();
 
-  static VKAPI_ATTR VkBool32 VKAPI_CALL
-  debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                VkDebugUtilsMessageTypeFlagsEXT messageType,
-                const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                void* pUserData);
-
   static FlutterVulkanImage GetNextImageCallback(
       void* user_data,
       const FlutterFrameInfo* frame_info);
@@ -121,4 +110,32 @@ class WaylandVulkanBackend : Backend {
       void* user_data,
       FlutterVulkanInstanceHandle instance,
       const char* procname);
+
+  VkDebugReportCallbackEXT mDebugCallback = VK_NULL_HANDLE;
+  VkDebugUtilsMessengerEXT mDebugMessenger = VK_NULL_HANDLE;
+
+  static VKAPI_ATTR VkBool32 VKAPI_CALL
+  debugUtilsCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+                     VkDebugUtilsMessageTypeFlagsEXT types,
+                     const VkDebugUtilsMessengerCallbackDataEXT* cbdata,
+                     void* pUserData);
+
+  static VKAPI_ATTR VkBool32 VKAPI_CALL
+  debugReportCallback(VkDebugReportFlagsEXT flags,
+                      VkDebugReportObjectTypeEXT objectType,
+                      uint64_t object,
+                      size_t location,
+                      int32_t messageCode,
+                      const char* pLayerPrefix,
+                      const char* pMessage,
+                      void* pUserData);
+
+  static bool CollectBackingStore(const FlutterBackingStore* renderer,
+                                  void* user_data);
+  static bool CreateBackingStore(const FlutterBackingStoreConfig* config,
+                                 FlutterBackingStore* backing_store_out,
+                                 void* user_data);
+  static bool PresentLayers(const FlutterLayer** layers,
+                            size_t layers_count,
+                            void* user_data);
 };

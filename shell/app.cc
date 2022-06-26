@@ -41,40 +41,36 @@ App::App(const std::string& app_id,
     : m_wayland_display(
           std::make_shared<Display>(enable_cursor, cursor_theme_name)),
 #if defined(BUILD_BACKEND_WAYLAND_EGL)
-      m_wayland_egl_backend(
-          std::make_shared<WaylandEglBackend>(m_wayland_display->GetDisplay(),
-                                       m_wayland_display->GetBaseSurface(),
-                                       debug_backend)),
+      m_wayland_egl_backend(std::make_shared<WaylandEglBackend>(
+          m_wayland_display->GetDisplay(),
+          m_wayland_display->GetBaseSurface(),
+          debug_backend)),
 #elif defined(BUILD_BACKEND_WAYLAND_VULKAN)
-      m_wayland_vulkan_backend(
-          std::make_shared<WaylandVulkanBackend>(m_wayland_display->GetDisplay(),
-                                          m_wayland_display->GetBaseSurface(),
-                                          width,
-                                          height,
-                                          debug_backend)),
+      m_wayland_vulkan_backend(std::make_shared<WaylandVulkanBackend>(
+          m_wayland_display->GetDisplay(),
+          m_wayland_display->GetBaseSurface(),
+          width,
+          height,
+          debug_backend)),
 #endif
-      #define getBackendPtr(x) (reinterpret_cast<Backend*>((x).get()))
-      m_wayland_window{
-          std::make_shared<WaylandWindow>(0,
-                                          m_wayland_display,
-                                          m_wayland_display->GetBaseSurface(),
-                                          WaylandWindow::WINDOW_BG,
-                                          app_id,
-                                          fullscreen,
-                                          width,
-                                          height,
+#define getBackendPtr(x) (reinterpret_cast<Backend*>((x).get()))
+      m_wayland_window {
+  std::make_shared<WaylandWindow>(
+      0, m_wayland_display, m_wayland_display->GetBaseSurface(),
+      WaylandWindow::WINDOW_BG, app_id, fullscreen, width, height,
 #if defined(BUILD_BACKEND_WAYLAND_EGL)
-                                          getBackendPtr(m_wayland_egl_backend))}
+      getBackendPtr(m_wayland_egl_backend))
+}
 #elif defined(BUILD_BACKEND_WAYLAND_VULKAN)
-                                          getBackendPtr(m_wayland_vulkan_backend))}
+      getBackendPtr(m_wayland_vulkan_backend))
+}
 #endif
 #ifdef ENABLE_TEXTURE_TEST_EGL
-      ,
-      m_texture_test_egl(std::make_unique<TextureTestEgl>(this))
+, m_texture_test_egl(std::make_unique<TextureTestEgl>(this))
 #endif
 #ifdef ENABLE_PLUGIN_TEXT_INPUT
       ,
-      m_text_input(std::make_shared<TextInput>())
+    m_text_input(std::make_shared<TextInput>())
 #endif
 {
 
@@ -175,13 +171,14 @@ int App::Loop() {
   }
 #endif
 
-  while (wl_display_prepare_read(m_wayland_display->GetDisplay()) != 0) {
-    wl_display_dispatch_pending(m_wayland_display->GetDisplay());
+  auto display = m_wayland_display->GetDisplay();
+  while (wl_display_prepare_read(display) != 0) {
+    wl_display_dispatch_pending(display);
   }
-  wl_display_flush(m_wayland_display->GetDisplay());
+  wl_display_flush(display);
 
-  wl_display_read_events(m_wayland_display->GetDisplay());
-  auto ret = wl_display_dispatch_pending(m_wayland_display->GetDisplay());
+  wl_display_read_events(display);
+  auto ret = wl_display_dispatch_pending(display);
 
   auto end_time = std::chrono::duration_cast<std::chrono::milliseconds>(
                       std::chrono::steady_clock::now().time_since_epoch())

@@ -45,7 +45,7 @@ class TextureTestEgl : public Texture {
  private:
   [[maybe_unused]] bool m_initialized;
 
-  WaylandEglBackend*m_egl_backend;
+  WaylandEglBackend* m_egl_backend;
 
   static void Create(void* userdata);
   static void Dispose(void* userdata);

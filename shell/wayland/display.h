@@ -71,8 +71,7 @@ class Display {
     return m_shm;
   }
 
-  [[maybe_unused]] void AglShellDoBackground(struct wl_surface*,
-                                             size_t index);
+  [[maybe_unused]] void AglShellDoBackground(struct wl_surface*, size_t index);
   [[maybe_unused]] void AglShellDoPanel(struct wl_surface*,
                                         enum agl_shell_edge mode,
                                         size_t index);
@@ -217,12 +216,12 @@ class Display {
   static const struct wl_surface_listener base_surface_listener;
 
   static void handle_base_surface_enter(void* data,
-                                           struct wl_surface* wl_surface,
-                                           struct wl_output* output);
+                                        struct wl_surface* wl_surface,
+                                        struct wl_output* output);
 
-  static void handle_base_surface_leave(void *data,
-                                          struct wl_surface *wl_surface,
-                                          struct wl_output *output);
+  static void handle_base_surface_leave(void* data,
+                                        struct wl_surface* wl_surface,
+                                        struct wl_output* output);
 
   static const struct wl_shm_listener shm_listener;
 
@@ -236,7 +235,7 @@ class Display {
 
   static void seat_handle_name(void* data,
                                struct wl_seat* seat,
-                               const char *name);
+                               const char* name);
 
   static bool pointerButtonStatePressed(struct pointer* p);
 
@@ -271,20 +270,19 @@ class Display {
                                   uint32_t axis,
                                   wl_fixed_t value);
 
-  static void pointer_handle_frame(void *data,
-                                   struct wl_pointer *wl_pointer);
+  static void pointer_handle_frame(void* data, struct wl_pointer* wl_pointer);
 
-  static void pointer_handle_axis_source(void *data,
-                                         struct wl_pointer *wl_pointer,
+  static void pointer_handle_axis_source(void* data,
+                                         struct wl_pointer* wl_pointer,
                                          uint32_t axis_source);
 
-  static void pointer_handle_axis_stop(void *data,
-                                       struct wl_pointer *wl_pointer,
+  static void pointer_handle_axis_stop(void* data,
+                                       struct wl_pointer* wl_pointer,
                                        uint32_t time,
                                        uint32_t axis);
 
-  static void pointer_handle_axis_discrete(void *data,
-                                           struct wl_pointer *wl_pointer,
+  static void pointer_handle_axis_discrete(void* data,
+                                           struct wl_pointer* wl_pointer,
                                            uint32_t axis,
                                            int32_t discrete);
 
@@ -322,8 +320,8 @@ class Display {
                                         uint32_t mods_locked,
                                         uint32_t group);
 
-  static void keyboard_handle_repeat_info(void *data,
-                                          struct wl_keyboard *wl_keyboard,
+  static void keyboard_handle_repeat_info(void* data,
+                                          struct wl_keyboard* wl_keyboard,
                                           int32_t rate,
                                           int32_t delay);
 

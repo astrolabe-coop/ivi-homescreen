@@ -84,3 +84,8 @@ static constexpr std::array<EGLint, 15> kEglConfigAttribs = {{
     EGL_NONE // termination sentinel
     // clang-format on
 }};
+
+// All vkCreate* functions take an optional allocator. For now we select the
+// default allocator by passing in a null pointer, and we highlight the argument
+// by using the VKALLOC constant.
+constexpr struct VkAllocationCallbacks* VKALLOC = nullptr;

@@ -79,7 +79,7 @@ class App {
     return m_wayland_window[index];
   }
 
-  Backend *GetBackend() {
+  Backend* GetBackend() {
 #if defined(BUILD_BACKEND_WAYLAND_EGL)
     return reinterpret_cast<Backend*>(m_wayland_egl_backend.get());
 #elif defined(BUILD_BACKEND_WAYLAND_VULKAN)

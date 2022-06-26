@@ -249,7 +249,8 @@ void handoff_handler(GstElement* fakesink,
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     draw_core(data->shader);
-    auto surface = reinterpret_cast<WaylandEglBackend*>(data->engine->GetBackend());
+    auto surface =
+        reinterpret_cast<WaylandEglBackend*>(data->engine->GetBackend());
     surface->ClearCurrent();
     data->texture->FrameReady();
   } else {
@@ -404,7 +405,8 @@ static gboolean sync_bus_call(GstBus* bus, GstMessage* msg, CustomData* data) {
           auto& codec = flutter::StandardMethodCodec::GetInstance();
           auto result = codec.EncodeSuccessEnvelope(&res);
           std::stringstream ss_event_name;
-          ss_event_name << GstreamerEgl::kChannelGstreamerEventPrefix << data->texture;
+          ss_event_name << GstreamerEgl::kChannelGstreamerEventPrefix
+                        << data->texture;
           auto event_name = ss_event_name.str();
           data->engine->SendPlatformMessage(event_name.c_str(), result->data(),
                                             result->size());
@@ -428,7 +430,8 @@ static gboolean sync_bus_call(GstBus* bus, GstMessage* msg, CustomData* data) {
           auto& codec = flutter::StandardMethodCodec::GetInstance();
           auto result = codec.EncodeSuccessEnvelope(&res);
           std::stringstream ss_event_name;
-          ss_event_name << GstreamerEgl::kChannelGstreamerEventPrefix << data->texture;
+          ss_event_name << GstreamerEgl::kChannelGstreamerEventPrefix
+                        << data->texture;
           auto event_name = ss_event_name.str();
           data->engine->SendPlatformMessage(event_name.c_str(), result->data(),
                                             result->size());
@@ -1068,7 +1071,7 @@ void main_loop(CustomData* data) {
 }
 
 void GstreamerEgl::OnInitialize(const FlutterPlatformMessage* message,
-                             void* userdata) {
+                                void* userdata) {
   auto engine = reinterpret_cast<Engine*>(userdata);
 
   PlatformChannel::GetInstance()->RegisterCallback(kChannelGstreamerCreate,
@@ -1134,7 +1137,7 @@ void OnEvent(const FlutterPlatformMessage* message, void* userdata) {
 }
 
 void GstreamerEgl::OnCreate(const FlutterPlatformMessage* message,
-                         void* userdata) {
+                            void* userdata) {
   PrintMessageAsHex(message);
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
@@ -1219,7 +1222,8 @@ void GstreamerEgl::OnCreate(const FlutterPlatformMessage* message,
   std::lock_guard<std::mutex> lock(gst_mutex);
 
   gst_init(nullptr, nullptr);
-  auto surface = reinterpret_cast<WaylandEglBackend*>(data->engine->GetBackend());
+  auto surface =
+      reinterpret_cast<WaylandEglBackend*>(data->engine->GetBackend());
   surface->MakeTextureCurrent();
 
   glGenVertexArrays(1, &vertex_arr_id);
@@ -1332,7 +1336,7 @@ flutter::EncodableValue dispose_error(const char* error_msg) {
 }
 
 void GstreamerEgl::OnDispose(const FlutterPlatformMessage* message,
-                          void* userdata) {
+                             void* userdata) {
   PrintMessageAsHex(message);
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
@@ -1402,7 +1406,7 @@ flutter::EncodableValue setLooping_error(const char* error_msg) {
 }
 
 void GstreamerEgl::OnSetLooping(const FlutterPlatformMessage* message,
-                             void* userdata) {
+                                void* userdata) {
   PrintMessageAsHex(message);
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
@@ -1448,7 +1452,7 @@ void GstreamerEgl::OnSetLooping(const FlutterPlatformMessage* message,
 
 // TODO - implementation specific
 void GstreamerEgl::OnSetVolume(const FlutterPlatformMessage* message,
-                            void* userdata) {
+                               void* userdata) {
   PrintMessageAsHex(message);
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
@@ -1492,7 +1496,7 @@ void GstreamerEgl::OnSetVolume(const FlutterPlatformMessage* message,
 }
 
 void GstreamerEgl::OnSetPlaybackSpeed(const FlutterPlatformMessage* message,
-                                   void* userdata) {
+                                      void* userdata) {
   PrintMessageAsHex(message);
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
@@ -1571,7 +1575,8 @@ flutter::EncodableValue play_error(const char* error_msg) {
   });
 }
 
-void GstreamerEgl::OnPlay(const FlutterPlatformMessage* message, void* userdata) {
+void GstreamerEgl::OnPlay(const FlutterPlatformMessage* message,
+                          void* userdata) {
   PrintMessageAsHex(message);
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
@@ -1628,7 +1633,7 @@ flutter::EncodableValue position_error(const char* error_msg) {
 }
 
 void GstreamerEgl::OnPosition(const FlutterPlatformMessage* message,
-                           void* userdata) {
+                              void* userdata) {
   PrintMessageAsHex(message);
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
@@ -1699,7 +1704,7 @@ flutter::EncodableValue seekTo_error(const char* error_msg) {
 }
 
 void GstreamerEgl::OnSeekTo(const FlutterPlatformMessage* message,
-                         void* userdata) {
+                            void* userdata) {
   PrintMessageAsHex(message);
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
@@ -1767,7 +1772,8 @@ flutter::EncodableValue pause_error(const char* error_msg) {
   });
 }
 
-void GstreamerEgl::OnPause(const FlutterPlatformMessage* message, void* userdata) {
+void GstreamerEgl::OnPause(const FlutterPlatformMessage* message,
+                           void* userdata) {
   PrintMessageAsHex(message);
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
@@ -1817,7 +1823,7 @@ void GstreamerEgl::OnPause(const FlutterPlatformMessage* message, void* userdata
 }
 
 void GstreamerEgl::OnSetMixWithOthers(const FlutterPlatformMessage* message,
-                                   void* userdata) {
+                                      void* userdata) {
   auto engine = reinterpret_cast<Engine*>(userdata);
   auto& codec = flutter::StandardMessageCodec::GetInstance();
   auto obj = codec.DecodeMessage(message->message, message->message_size);

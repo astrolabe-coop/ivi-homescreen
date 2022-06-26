@@ -91,7 +91,7 @@ Engine::Engine(App* app,
                 FML_LOG(INFO) << tag << ": " << message;
               },
       }) {
-#if 0 //TODO
+#if 0  // TODO
       m_renderer_config({
           .type = kOpenGL,
            .open_gl = {
@@ -238,6 +238,8 @@ Engine::Engine(App* app,
 
   m_args.custom_task_runners = &m_custom_task_runners;
 
+  // TODO m_args.compositor = m_backend->GetCompositorConfig();
+
   FML_DLOG(INFO) << "(" << m_index << ") -Engine::Engine";
 }
 
@@ -290,9 +292,9 @@ bool Engine::IsRunning() const {
 FlutterEngineResult Engine::Run(pthread_t event_loop_thread_id) {
   FML_DLOG(INFO) << "(" << m_index << ") +Engine::Run";
 
-  FlutterEngineResult result =
-      m_proc_table.Initialize(FLUTTER_ENGINE_VERSION, m_backend->GetRenderConfig(),
-                              &m_args, this, &m_flutter_engine);
+  FlutterEngineResult result = m_proc_table.Initialize(
+      FLUTTER_ENGINE_VERSION, m_backend->GetRenderConfig(), &m_args, this,
+      &m_flutter_engine);
   if (result != kSuccess) {
     FML_DLOG(ERROR) << "(" << m_index
                     << ") FlutterEngineRun failed or engine is null";

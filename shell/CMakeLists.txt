@@ -78,9 +78,9 @@ set(SRC_FILES
 
 if (BUILD_BACKEND_WAYLAND_EGL)
     list(APPEND SRC_FILES backend/wayland_egl.cc)
-elseif(BUILD_BACKEND_WAYLAND_VULKAN)
+elseif (BUILD_BACKEND_WAYLAND_VULKAN)
     list(APPEND SRC_FILES backend/wayland_vulkan.cc)
-endif()
+endif ()
 
 add_executable(homescreen ${SRC_FILES})
 

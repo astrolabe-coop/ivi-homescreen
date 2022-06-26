@@ -48,10 +48,18 @@ class Backend {
   Backend(const Backend&) = delete;
   const Backend& operator=(const Backend&) = delete;
 
-  const FlutterRendererConfig *GetRenderConfig() { return &m_render_config; }
+  const FlutterRendererConfig* GetRenderConfig() { return &m_render_config; }
 
   void SetRenderConfig(FlutterRendererConfig config) {
     m_render_config = config;
+  }
+
+  const FlutterCompositor* GetCompositorConfig() {
+    return &m_compositor_config;
+  }
+
+  void SetCompositorConfig(FlutterCompositor config) {
+    m_compositor_config = config;
   }
 
   void Resize(size_t index,
@@ -77,5 +85,6 @@ class Backend {
   void* m_user_data;
   ResizeCallback m_resize_callback;
   CreateSurfaceCallback m_create_surface_callback;
-  FlutterRendererConfig m_render_config;
+  FlutterRendererConfig m_render_config{};
+  FlutterCompositor m_compositor_config{};
 };

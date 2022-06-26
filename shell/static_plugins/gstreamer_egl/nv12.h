@@ -45,7 +45,6 @@ class Shader {
         textureId(_textureId),
         width(_width),
         height(_height) {
-
     texY = glGetUniformLocation(program, "textureY");
     texUV = glGetUniformLocation(program, "textureUV");
     glUseProgram(program);
@@ -83,12 +82,14 @@ class Shader {
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
       switch (glCheckFramebufferStatus(GL_FRAMEBUFFER)) {
         case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
-          FML_LOG(ERROR) << "failed to draw to framebuffer: "
-                            "the framebuffer attachment points are framebuffer incomplete";
+          FML_LOG(ERROR)
+              << "failed to draw to framebuffer: "
+                 "the framebuffer attachment points are framebuffer incomplete";
           break;
         case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
           FML_LOG(ERROR) << "failed to draw to framebuffer: "
-                            "the framebuffer does not have at least one image attached to it";
+                            "the framebuffer does not have at least one image "
+                            "attached to it";
           break;
         case GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS:
           FML_LOG(ERROR) << "failed to draw to framebuffer: "
@@ -97,7 +98,8 @@ class Shader {
         case GL_FRAMEBUFFER_UNSUPPORTED:
         default:
           FML_LOG(ERROR)
-              << "failed to draw to framebuffer: target is the default framebuffer, but the default framebuffer does not exist";
+              << "failed to draw to framebuffer: target is the default "
+                 "framebuffer, but the default framebuffer does not exist";
           break;
       }
       return;

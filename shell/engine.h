@@ -124,17 +124,19 @@ class Engine {
 
 #if ENABLE_PLUGIN_TEXT_INPUT
   TextInput* m_text_input{};
-  [[maybe_unused]] void SetTextInput(TextInput *text_input);
-  [[maybe_unused]] TextInput *GetTextInput() const;
+  [[maybe_unused]] void SetTextInput(TextInput* text_input);
+  [[maybe_unused]] TextInput* GetTextInput() const;
 #endif
 
-  Backend *GetBackend() { return m_backend; }
+  Backend* GetBackend() {
+    return m_backend;
+  }
 
  private:
   size_t m_index;
   bool m_running;
 
-  Backend *m_backend;
+  Backend* m_backend;
   std::shared_ptr<WaylandWindow> m_egl_window;
   std::shared_ptr<GlResolver> m_gl_resolver;
 

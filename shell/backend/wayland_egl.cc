@@ -1,18 +1,18 @@
 /*
-* Copyright 2020-2022 Toyota Connected North America
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2020-2022 Toyota Connected North America
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #include "wayland_egl.h"
 
@@ -33,9 +33,9 @@
 #include "shell/wayland/window.h"
 
 WaylandEglBackend::WaylandEglBackend(struct wl_display* display,
-                       struct wl_surface* surface,
-                       bool debug_backend,
-                       int buffer_size)
+                                     struct wl_surface* surface,
+                                     bool debug_backend,
+                                     int buffer_size)
     : wl_display_(display),
       wl_surface_(surface),
       resize_pending_(false),
@@ -123,7 +123,8 @@ WaylandEglBackend::WaylandEglBackend(struct wl_display* display,
 
   FML_DLOG(INFO) << "- BackendEgl()";
 
-  SetRenderConfig({.type = kOpenGL,
+  SetRenderConfig(
+      {.type = kOpenGL,
        .open_gl = {
            .struct_size = sizeof(FlutterOpenGLRendererConfig),
            .make_current = [](void* userdata) -> bool {
@@ -159,15 +160,17 @@ WaylandEglBackend::WaylandEglBackend(struct wl_display* display,
                   size_t height, FlutterOpenGLTexture* texture_out) -> bool {
              auto e = reinterpret_cast<Engine*>(userdata);
              auto texture = e->GetTextureObj(texture_id);
-            if (texture) {
-              texture->GetFlutterOpenGLTexture(texture_out,
-                                               static_cast<int>(width),
-                                               static_cast<int>(height));
-              return true;
-            }
+             if (texture) {
+               texture->GetFlutterOpenGLTexture(texture_out,
+                                                static_cast<int>(width),
+                                                static_cast<int>(height));
+               return true;
+             }
              return false;
            },
        }});
+
+  SetCompositorConfig({});
 }
 
 WaylandEglBackend::~WaylandEglBackend() {
@@ -285,8 +288,8 @@ void* WaylandEglBackend::get_egl_proc_address(const char* address) {
 }
 
 EGLDisplay WaylandEglBackend::get_egl_display(EGLenum platform,
-                                       void* native_display,
-                                       const EGLint* attrib_list) {
+                                              void* native_display,
+                                              const EGLint* attrib_list) {
   static PFNEGLGETPLATFORMDISPLAYEXTPROC get_platform_display = nullptr;
 
   if (!get_platform_display) {
@@ -302,7 +305,7 @@ EGLDisplay WaylandEglBackend::get_egl_display(EGLenum platform,
 }
 
 EGLSurface WaylandEglBackend::create_egl_surface(void* native_window,
-                                          const EGLint* attrib_list) {
+                                                 const EGLint* attrib_list) {
   static PFNEGLCREATEPLATFORMWINDOWSURFACEEXTPROC create_platform_window =
       nullptr;
 
@@ -639,8 +642,9 @@ struct egl_config_attribute egl_config_attributes[] = {
     },
 };
 
-[[maybe_unused]] void WaylandEglBackend::ReportGlesAttributes(EGLConfig* configs,
-                                                       EGLint count) {
+[[maybe_unused]] void WaylandEglBackend::ReportGlesAttributes(
+    EGLConfig* configs,
+    EGLint count) {
   FML_DLOG(INFO) << "OpenGL ES Attributes:";
   FML_DLOG(INFO) << "\tEGL_VENDOR: \"" << eglQueryString(m_dpy, EGL_VENDOR)
                  << "\"";
@@ -795,7 +799,7 @@ void* WaylandEglBackend::gl_process_resolver(const char* name) {
 }
 
 int WaylandEglBackend::get_handle(std::array<char[kSoMaxLength], kSoCount> arr,
-                           void** out_handle) {
+                                  void** out_handle) {
   void* handle = nullptr;
 
   for (const auto& item : arr) {
@@ -816,10 +820,10 @@ int WaylandEglBackend::get_handle(std::array<char[kSoMaxLength], kSoCount> arr,
 }
 
 void WaylandEglBackend::Resize(void* user_data,
-                        size_t index,
-                        Engine* engine,
-                        int32_t width,
-                        int32_t height) {
+                               size_t index,
+                               Engine* engine,
+                               int32_t width,
+                               int32_t height) {
   auto b = reinterpret_cast<WaylandEglBackend*>(user_data);
   if (b->m_egl_window[index]) {
     if (engine) {
@@ -833,10 +837,10 @@ void WaylandEglBackend::Resize(void* user_data,
 }
 
 void WaylandEglBackend::CreateSurface(void* user_data,
-                               size_t index,
-                               wl_surface* surface,
-                               int32_t width,
-                               int32_t height) {
+                                      size_t index,
+                                      wl_surface* surface,
+                                      int32_t width,
+                                      int32_t height) {
   auto b = reinterpret_cast<WaylandEglBackend*>(user_data);
   b->m_egl_window[index] = wl_egl_window_create(surface, width, height);
   b->m_egl_surface[index] =

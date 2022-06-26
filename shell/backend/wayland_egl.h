@@ -23,24 +23,32 @@
 #include <EGL/eglext.h>
 #include <wayland-egl.h>
 
-#include "constants.h"
 #include "backend/backend.h"
-
+#include "constants.h"
 
 class WaylandEglBackend : Backend {
  public:
   WaylandEglBackend(struct wl_display* display,
-                struct wl_surface* surface,
-                bool debug_backend,
-                int buffer_size = kEglBufferSize);
+                    struct wl_surface* surface,
+                    bool debug_backend,
+                    int buffer_size = kEglBufferSize);
   ~WaylandEglBackend();
 
-  static void Resize(void *user_data, size_t index, Engine *engine, int32_t width, int32_t height);
+  static void Resize(void* user_data,
+                     size_t index,
+                     Engine* engine,
+                     int32_t width,
+                     int32_t height);
 
-  static void CreateSurface(void *user_data, size_t index, wl_surface *surface, int32_t width, int32_t height);
+  static void CreateSurface(void* user_data,
+                            size_t index,
+                            wl_surface* surface,
+                            int32_t width,
+                            int32_t height);
 
-  [[maybe_unused]]
-  EGLSurface GetSurface(size_t index) { return m_egl_surface[index]; }
+  [[maybe_unused]] EGLSurface GetSurface(size_t index) {
+    return m_egl_surface[index];
+  }
 
   bool ClearCurrent();
   bool MakeCurrent(size_t index);
@@ -74,7 +82,7 @@ class WaylandEglBackend : Backend {
   std::vector<void*> m_hDL;
   static int get_handle(std::array<char[kSoMaxLength], kSoCount> arr,
                         void** out_handle);
-  void *gl_process_resolver(const char* name);
+  void* gl_process_resolver(const char* name);
 
   PFNEGLDEBUGMESSAGECONTROLKHRPROC m_pfDebugMessageControl;
   PFNEGLQUERYDEBUGKHRPROC m_pfQueryDebug;

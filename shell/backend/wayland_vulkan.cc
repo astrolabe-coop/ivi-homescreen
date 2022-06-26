@@ -1,18 +1,18 @@
 /*
-* Copyright 2021-2022 Toyota Connected North America
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2021-2022 Toyota Connected North America
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #include "wayland_vulkan.h"
 
@@ -23,28 +23,26 @@
 
 #include "third_party/flutter/fml/logging.h"
 
-#include "engine.h"
 #include "constants.h"
+#include "engine.h"
 
 WaylandVulkanBackend::WaylandVulkanBackend(struct wl_display* display,
-                             struct wl_surface* surface,
-                             uint32_t width,
-                             uint32_t height,
-                             bool enable_validation_layers)
+                                           struct wl_surface* surface,
+                                           uint32_t width,
+                                           uint32_t height,
+                                           bool enable_validation_layers)
     : wl_display_(display),
       wl_surface_(surface),
       width_(width),
       height_(height),
       enable_validation_layers_(enable_validation_layers),
       resize_pending_(false),
-      Backend(this, Resize, CreateSurface)
-{
+      Backend(this, Resize, CreateSurface) {
   if (!bluevk::initialize()) {
     FML_LOG(ERROR) << "BlueVK is unable to load entry points.\n";
     exit(EXIT_FAILURE);
   }
   createInstance();
-  bluevk::bindInstance(state_.instance);
   setupDebugMessenger();
   createSurface(wl_display_, wl_surface_);
   findPhysicalDevice();
@@ -82,26 +80,34 @@ WaylandVulkanBackend::WaylandVulkanBackend(struct wl_display* display,
     exit(EXIT_FAILURE);
   }
 
-  SetRenderConfig({
-      .type = kVulkan,
-      .vulkan {
-          .struct_size = sizeof(FlutterRendererConfig),
-          .version = VK_MAKE_VERSION(1, 1, 0),
-          .instance = state_.instance,
-          .physical_device = state_.physical_device,
-          .device = state_.device,
-          .queue_family_index = state_.queue_family_index,
-          .queue = state_.queue,
-          .enabled_instance_extension_count = state_.enabled_instance_extensions.size(),
-          .enabled_instance_extensions = state_.enabled_instance_extensions.data(),
-          .enabled_device_extension_count = state_.enabled_device_extensions.size(),
-          .enabled_device_extensions = state_.enabled_device_extensions.data(),
-          .get_instance_proc_address_callback =
-              GetInstanceProcAddressCallback,
-          .get_next_image_callback = GetNextImageCallback,
-          .present_image_callback = PresentCallback,
-      }
-  });
+  SetRenderConfig(
+      {.type = kVulkan,
+       .vulkan{
+           .struct_size = sizeof(FlutterRendererConfig),
+           .version = VK_MAKE_VERSION(1, 1, 0),
+           .instance = state_.instance,
+           .physical_device = state_.physical_device,
+           .device = state_.device,
+           .queue_family_index = state_.queue_family_index,
+           .queue = state_.queue,
+           .enabled_instance_extension_count =
+               state_.enabled_instance_extensions.size(),
+           .enabled_instance_extensions =
+               state_.enabled_instance_extensions.data(),
+           .enabled_device_extension_count =
+               state_.enabled_device_extensions.size(),
+           .enabled_device_extensions = state_.enabled_device_extensions.data(),
+           .get_instance_proc_address_callback = GetInstanceProcAddressCallback,
+           .get_next_image_callback = GetNextImageCallback,
+           .present_image_callback = PresentCallback,
+       }});
+
+  SetCompositorConfig({.struct_size = sizeof(FlutterCompositor),
+                       .user_data = this,
+                       .create_backing_store_callback = CreateBackingStore,
+                       .collect_backing_store_callback = CollectBackingStore,
+                       .present_layers_callback = PresentLayers,
+                       .avoid_backing_store_cache = true});
 }
 
 WaylandVulkanBackend::~WaylandVulkanBackend() {
@@ -123,7 +129,14 @@ WaylandVulkanBackend::~WaylandVulkanBackend() {
     bluevk::vkDestroySurfaceKHR(state_.instance, state_.surface, nullptr);
   }
   if (enable_validation_layers_) {
-    DestroyDebugUtilsMessengerEXT(state_.instance, debugMessenger_, nullptr);
+    if (mDebugCallback) {
+      bluevk::vkDestroyDebugReportCallbackEXT(state_.instance, mDebugCallback,
+                                              VKALLOC);
+    }
+    if (mDebugMessenger) {
+      bluevk::vkDestroyDebugUtilsMessengerEXT(state_.instance, mDebugMessenger,
+                                              VKALLOC);
+    }
   }
   if (state_.instance != nullptr) {
     bluevk::vkDestroyInstance(state_.instance, nullptr);
@@ -133,21 +146,27 @@ WaylandVulkanBackend::~WaylandVulkanBackend() {
 void WaylandVulkanBackend::createInstance() {
   auto instance_extensions = enumerateInstanceExtensionProperties();
   for (const auto& l : instance_extensions) {
-    //FML_DLOG(INFO) << l.extensionName << ", ver: " << l.specVersion;
-    if (!enable_validation_layers_ &&
-        ((strcmp(l.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0) ||
-         (strcmp(l.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0)))
-      continue;
-    //    state_.enabled_instance_extensions.push_back(l.extensionName);
+    FML_DLOG(INFO) << l.extensionName << ", ver: " << l.specVersion;
+    if (enable_validation_layers_) {
+      if (strcmp(l.extensionName, VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME) ==
+          0) {
+        state_.validationFeaturesSupported = true;
+        state_.enabled_instance_extensions.push_back(l.extensionName);
+      }
+      if (strcmp(l.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
+        state_.debugUtilsSupported = true;
+        state_.enabled_instance_extensions.push_back(l.extensionName);
+      }
+      if (strcmp(l.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0) {
+        state_.debugReportExtensionSupported = true;
+        state_.enabled_instance_extensions.push_back(l.extensionName);
+      }
+    }
   }
+
   state_.enabled_instance_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
   state_.enabled_instance_extensions.push_back(
       VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
-
-  if (enable_validation_layers_) {
-    state_.enabled_instance_extensions.push_back(
-        VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-  }
 
   FML_LOG(INFO) << "Enabling " << state_.enabled_instance_extensions.size()
                 << " instance extensions:";
@@ -164,6 +183,7 @@ void WaylandVulkanBackend::createInstance() {
       .engineVersion = VK_MAKE_VERSION(1, 0, 0),
       .apiVersion = VK_MAKE_VERSION(1, 1, 0),
   };
+
   VkInstanceCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .flags = 0,
@@ -173,18 +193,26 @@ void WaylandVulkanBackend::createInstance() {
       .ppEnabledExtensionNames = state_.enabled_instance_extensions.data(),
   };
 
+  VkValidationFeaturesEXT features = {};
+  VkValidationFeatureEnableEXT enables[] = {
+      VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
+      // TODO: Enable synchronization validation.
+      // VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+  };
+  if (state_.validationFeaturesSupported) {
+    features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+    features.enabledValidationFeatureCount =
+        sizeof(enables) / sizeof(enables[0]);
+    features.pEnabledValidationFeatures = enables;
+    //    info.pNext = &features;
+  }
+
   static constexpr char VK_LAYER_KHRONOS_VALIDATION_NAME[] =
       "VK_LAYER_KHRONOS_validation";
-  //  static constexpr char VK_LAYER_NV_OPTIMUS_NAME[] = "VK_LAYER_NV_optimus";
-  //  static constexpr char VK_LAYER_MESA_DEVICE_SELECT_NAME[] =
-  //  "VK_LAYER_MESA_device_select";
-
-  //  state_.enabled_layer_extensions.push_back(VK_LAYER_NV_OPTIMUS_NAME);
-  //  state_.enabled_layer_extensions.push_back(VK_LAYER_MESA_DEVICE_SELECT_NAME);
 
   auto available_layers = enumerateInstanceLayerProperties();
   for (const auto& l : available_layers) {
-    //FML_DLOG(INFO) << l.layerName << ", ver: " << l.specVersion;
+    // FML_DLOG(INFO) << l.layerName << ", ver: " << l.specVersion;
     if (enable_validation_layers_ &&
         strcmp(l.layerName, VK_LAYER_KHRONOS_VALIDATION_NAME) == 0) {
       state_.enabled_layer_extensions.push_back(
@@ -200,10 +228,12 @@ void WaylandVulkanBackend::createInstance() {
     FML_LOG(ERROR) << "Failed to create Vulkan instance." << std::endl;
     exit(EXIT_FAILURE);
   }
+
+  bluevk::bindInstance(state_.instance);
 }
 
 void WaylandVulkanBackend::createSurface(struct wl_display* display,
-                                  struct wl_surface* surface) {
+                                         struct wl_surface* surface) {
   assert(state_.instance != VK_NULL_HANDLE);
   assert(state_.surface == VK_NULL_HANDLE);
   assert(display != nullptr);
@@ -226,51 +256,38 @@ void WaylandVulkanBackend::createSurface(struct wl_display* display,
   }
 }
 
-VkResult WaylandVulkanBackend::CreateDebugUtilsMessengerEXT(
-    VkInstance instance,
-    const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkDebugUtilsMessengerEXT* pDebugMessenger) {
-  auto func = (PFN_vkCreateDebugUtilsMessengerEXT)bluevk::vkGetInstanceProcAddr(
-      instance, "vkCreateDebugUtilsMessengerEXT");
-  if (func != nullptr) {
-    return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
-  } else {
-    return VK_ERROR_EXTENSION_NOT_PRESENT;
-  }
-}
-
-void WaylandVulkanBackend::DestroyDebugUtilsMessengerEXT(
-    VkInstance instance,
-    VkDebugUtilsMessengerEXT debugMessenger,
-    const VkAllocationCallbacks* pAllocator) {
-  auto func =
-      (PFN_vkDestroyDebugUtilsMessengerEXT)bluevk::vkGetInstanceProcAddr(
-          instance, "vkDestroyDebugUtilsMessengerEXT");
-  if (func != nullptr) {
-    func(instance, debugMessenger, pAllocator);
-  }
-}
-
 void WaylandVulkanBackend::setupDebugMessenger() {
   if (!enable_validation_layers_)
     return;
 
-  VkDebugUtilsMessengerCreateInfoEXT createInfo{
-      .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-      .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                         VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                         VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-      .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                     VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                     VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-      .pfnUserCallback = debugCallback,
-      .pUserData = nullptr,
-  };
+  if (state_.debugUtilsSupported) {
+    VkDebugUtilsMessengerCreateInfoEXT createInfo{
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .pNext = nullptr,
+        .flags = 0,
+        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        .pfnUserCallback = debugUtilsCallback,
+        .pUserData = nullptr,
+    };
 
-  if (CreateDebugUtilsMessengerEXT(state_.instance, &createInfo, nullptr,
-                                   &debugMessenger_) != VK_SUCCESS) {
-    FML_LOG(ERROR) << "failed to set up debug messenger!";
+    if (bluevk::vkCreateDebugUtilsMessengerEXT(state_.instance, &createInfo,
+                                               VKALLOC, &mDebugMessenger) !=
+        VK_SUCCESS) {
+      FML_LOG(ERROR) << "Unable to create Vulkan debug callback";
+    }
+  } else if (bluevk::vkCreateDebugReportCallbackEXT) {
+    const VkDebugReportCallbackCreateInfoEXT cbinfo = {
+        VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT, nullptr,
+        VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT,
+        debugReportCallback, nullptr};
+    if (bluevk::vkCreateDebugReportCallbackEXT(
+            state_.instance, &cbinfo, VKALLOC, &mDebugCallback) != VK_SUCCESS) {
+      FML_LOG(ERROR) << "Unable to create Vulkan debug callback";
+    };
   }
 }
 
@@ -340,6 +357,8 @@ void WaylandVulkanBackend::findPhysicalDevice() {
 
     bool supports_swapchain = false;
     for (const auto& available_extension : available_extensions) {
+      FML_DLOG(INFO) << available_extension.extensionName
+                     << ", ver: " << available_extension.specVersion;
       if (strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                  available_extension.extensionName) == 0) {
         supports_swapchain = true;
@@ -353,13 +372,27 @@ void WaylandVulkanBackend::findPhysicalDevice() {
         supported_extensions.push_back(
             VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
       }
-
       // Prefer GPUs that support VK_KHR_get_memory_requirements2.
       else if (strcmp(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
                       available_extension.extensionName) == 0) {
         score += 1 << 29;
         supported_extensions.push_back(
             VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+      } else if (strcmp(VK_EXT_DEBUG_MARKER_EXTENSION_NAME,
+                        available_extension.extensionName) == 0) {
+        state_.debugMarkersSupported = true;
+      } else if (strcmp(VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+                        available_extension.extensionName) == 0) {
+        state_.maintenanceSupported[0] = true;
+        supported_extensions.push_back(VK_KHR_MAINTENANCE1_EXTENSION_NAME);
+      } else if (strcmp(VK_KHR_MAINTENANCE2_EXTENSION_NAME,
+                        available_extension.extensionName) == 0) {
+        state_.maintenanceSupported[1] = true;
+        supported_extensions.push_back(VK_KHR_MAINTENANCE2_EXTENSION_NAME);
+      } else if (strcmp(VK_KHR_MAINTENANCE3_EXTENSION_NAME,
+                        available_extension.extensionName) == 0) {
+        state_.maintenanceSupported[2] = true;
+        supported_extensions.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
       }
     }
 
@@ -411,10 +444,11 @@ void WaylandVulkanBackend::findPhysicalDevice() {
       const uint32_t deviceID = properties.deviceID;
       const int major = VK_VERSION_MAJOR(properties.apiVersion);
       const int minor = VK_VERSION_MINOR(properties.apiVersion);
-      FML_LOG(INFO) << "(vendor " << std::hex << vendorID << ", "
+      FML_LOG(INFO) << "vendor " << std::hex << vendorID << ", "
                     << "device " << deviceID << ", "
                     << "driver " << driverVersion << ", " << std::dec << "api "
-                    << major << "." << minor << ")";
+                    << major << "." << minor;
+      break;
     }
   }
 
@@ -499,7 +533,7 @@ bool WaylandVulkanBackend::InitializeSwapchain() {
   /// window size.
   /// --------------------------------------------------------------------------
 
-  VkExtent2D extent;
+  VkExtent2D clientSize;
 
   VkSurfaceCapabilitiesKHR surface_capabilities;
   bluevk::vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -507,19 +541,36 @@ bool WaylandVulkanBackend::InitializeSwapchain() {
 
   if (surface_capabilities.currentExtent.width != UINT32_MAX) {
     // If the surface reports a specific extent, we must use it.
-    extent = surface_capabilities.currentExtent;
+    clientSize = surface_capabilities.currentExtent;
   } else {
     VkExtent2D actual_extent = {
         .width = width_,
         .height = height_,
     };
-    extent.width = std::max(surface_capabilities.minImageExtent.width,
-                            std::min(surface_capabilities.maxImageExtent.width,
-                                     actual_extent.width));
-    extent.height =
+    clientSize.width =
+        std::max(surface_capabilities.minImageExtent.width,
+                 std::min(surface_capabilities.maxImageExtent.width,
+                          actual_extent.width));
+    clientSize.height =
         std::max(surface_capabilities.minImageExtent.height,
                  std::min(surface_capabilities.maxImageExtent.height,
                           actual_extent.height));
+  }
+
+  ///
+  /// Desired image count
+  ///
+  const uint32_t maxImageCount = surface_capabilities.maxImageCount;
+  const uint32_t minImageCount = surface_capabilities.minImageCount;
+  uint32_t desiredImageCount = minImageCount + 1;
+
+  // According to section 30.5 of VK 1.1, maxImageCount of zero means "that
+  // there is no limit on the number of images, though there may be limits
+  // related to the total amount of memory used by presentable images."
+  if (maxImageCount != 0 && desiredImageCount > maxImageCount) {
+    FML_LOG(ERROR) << "Swap chain does not support " << desiredImageCount
+                   << " images.";
+    desiredImageCount = surface_capabilities.minImageCount;
   }
 
   /// --------------------------------------------------------------------------
@@ -547,26 +598,36 @@ bool WaylandVulkanBackend::InitializeSwapchain() {
   /// Create the swapchain.
   /// --------------------------------------------------------------------------
 
+  const VkCompositeAlphaFlagBitsKHR compositeAlpha =
+      (surface_capabilities.supportedCompositeAlpha &
+       VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)
+          ? VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR
+          : VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+
   VkSwapchainCreateInfoKHR info = {
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
       .pNext = nullptr,
       .surface = state_.surface,
-      .minImageCount = surface_capabilities.minImageCount + 1,
+      .minImageCount = desiredImageCount,
       .imageFormat = state_.surface_format.format,
       .imageColorSpace = state_.surface_format.colorSpace,
-      .imageExtent = extent,
+      .imageExtent = clientSize,
       .imageArrayLayers = 1,
-      .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+      .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT |  // Allows use as a blit
+                                                       // destination.
+                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT,   // Allows use as a blit
+                                                      // source (for readPixels)
       .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 0,
       .pQueueFamilyIndices = nullptr,
       .preTransform = surface_capabilities.currentTransform,
-      .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+      .compositeAlpha = compositeAlpha,
       .presentMode = present_mode,
       .clipped = VK_TRUE,
       .oldSwapchain = VK_NULL_HANDLE,
   };
-  VkResult result = bluevk::vkCreateSwapchainKHR(state_.device, &info, nullptr,
+  VkResult result = bluevk::vkCreateSwapchainKHR(state_.device, &info, VKALLOC,
                                                  &state_.swapchain);
   if (result != VK_SUCCESS) {
     FML_LOG(ERROR) << "vkGetSwapchainImagesKHR(): " << result;
@@ -580,6 +641,7 @@ bool WaylandVulkanBackend::InitializeSwapchain() {
   uint32_t image_count;
   bluevk::vkGetSwapchainImagesKHR(state_.device, state_.swapchain, &image_count,
                                   nullptr);
+  state_.swapchain_images.reserve(image_count);
   state_.swapchain_images.resize(image_count);
   bluevk::vkGetSwapchainImagesKHR(state_.device, state_.swapchain, &image_count,
                                   state_.swapchain_images.data());
@@ -690,17 +752,40 @@ WaylandVulkanBackend::enumerateInstanceExtensionProperties() {
   return properties;
 }
 
-VkBool32 WaylandVulkanBackend::debugCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT messageType,
-    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+VKAPI_ATTR VkBool32 VKAPI_CALL
+WaylandVulkanBackend::debugReportCallback(VkDebugReportFlagsEXT flags,
+                                          VkDebugReportObjectTypeEXT objectType,
+                                          uint64_t object,
+                                          size_t location,
+                                          int32_t messageCode,
+                                          const char* pLayerPrefix,
+                                          const char* pMessage,
+                                          void* pUserData) {
+  if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) {
+    FML_LOG(ERROR) << "VULKAN ERROR: (" << pLayerPrefix << ") " << pMessage;
+  } else {
+    FML_LOG(WARNING) << "VULKAN WARNING: (" << pLayerPrefix << ") " << pMessage;
+  }
+  return VK_FALSE;
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL WaylandVulkanBackend::debugUtilsCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    VkDebugUtilsMessageTypeFlagsEXT types,
+    const VkDebugUtilsMessengerCallbackDataEXT* cbdata,
     void* pUserData) {
-  (void)messageSeverity;
-  (void)messageType;
-  (void)pUserData;
-
-  FML_LOG(INFO) << pCallbackData->pMessage;
-
+  if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+    FML_LOG(ERROR) << "VULKAN ERROR: (" << cbdata->pMessageIdName << ") "
+                   << cbdata->pMessage;
+  } else {
+    // TODO: emit best practices warnings about aggressive pipeline barriers.
+    if (strstr(cbdata->pMessage, "ALL_GRAPHICS_BIT") ||
+        strstr(cbdata->pMessage, "ALL_COMMANDS_BIT")) {
+      return VK_FALSE;
+    }
+    FML_LOG(WARNING) << "VULKAN WARNING: (" << cbdata->pMessageIdName << ") "
+                     << cbdata->pMessage;
+  }
   return VK_FALSE;
 }
 
@@ -736,7 +821,7 @@ FlutterVulkanImage WaylandVulkanBackend::GetNextImageCallback(
 }
 
 bool WaylandVulkanBackend::PresentCallback(void* user_data,
-                                    const FlutterVulkanImage* image) {
+                                           const FlutterVulkanImage* image) {
   (void)image;
   auto e = reinterpret_cast<Engine*>(user_data);
   auto b = reinterpret_cast<WaylandVulkanBackend*>(e->GetBackend());
@@ -785,10 +870,14 @@ void* WaylandVulkanBackend::GetInstanceProcAddressCallback(
   return reinterpret_cast<void*>(proc);
 }
 
-void WaylandVulkanBackend::Resize(void *user_data, size_t index, Engine *engine, int32_t width, int32_t height) {
+void WaylandVulkanBackend::Resize(void* user_data,
+                                  size_t index,
+                                  Engine* engine,
+                                  int32_t width,
+                                  int32_t height) {
   (void)index;
   auto b = reinterpret_cast<WaylandVulkanBackend*>(user_data);
-  if(b->width_ != width || b->height_ != height) {
+  if (b->width_ != width || b->height_ != height) {
     b->resize_pending_ = true;
     b->width_ = width;
     b->height_ = height;
@@ -801,10 +890,33 @@ void WaylandVulkanBackend::Resize(void *user_data, size_t index, Engine *engine,
   }
 }
 
-void WaylandVulkanBackend::CreateSurface(void *user_data, size_t index, wl_surface *surface, int32_t width, int32_t height) {
+void WaylandVulkanBackend::CreateSurface(void* user_data,
+                                         size_t index,
+                                         wl_surface* surface,
+                                         int32_t width,
+                                         int32_t height) {
   (void)user_data;
   (void)index;
   (void)surface;
   (void)width;
   (void)height;
+}
+
+bool WaylandVulkanBackend::CollectBackingStore(
+    const FlutterBackingStore* renderer,
+    void* user_data) {
+  return false;
+}
+
+bool WaylandVulkanBackend::CreateBackingStore(
+    const FlutterBackingStoreConfig* config,
+    FlutterBackingStore* backing_store_out,
+    void* user_data) {
+  return false;
+}
+
+bool WaylandVulkanBackend::PresentLayers(const FlutterLayer** layers,
+                                         size_t layers_count,
+                                         void* user_data) {
+  return false;
 }

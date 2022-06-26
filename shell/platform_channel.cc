@@ -71,7 +71,8 @@ PlatformChannel::PlatformChannel() {
   RegisterCallback(MouseCursor::kChannelName, &MouseCursor::OnPlatformMessage);
 #endif
 #ifdef ENABLE_PLUGIN_GSTREAMER_EGL
-  RegisterCallback(GstreamerEgl::kChannelGstreamerInitialize, &GstreamerEgl::OnInitialize);
+  RegisterCallback(GstreamerEgl::kChannelGstreamerInitialize,
+                   &GstreamerEgl::OnInitialize);
 #endif
 #ifdef ENABLE_PLUGIN_NAVIGATION
   RegisterCallback(Navigation::kChannelName, &Navigation::OnPlatformMessage);
@@ -97,6 +98,7 @@ PlatformChannel::PlatformChannel() {
   RegisterCallback(UrlLauncher::kChannelName, &UrlLauncher::OnPlatformMessage);
 #endif
 #ifdef ENABLE_PLUGIN_SECURE_STORAGE
-  RegisterCallback(SecureStorage::kChannelName, &SecureStorage::OnPlatformMessage);
+  RegisterCallback(SecureStorage::kChannelName,
+                   &SecureStorage::OnPlatformMessage);
 #endif
 }
